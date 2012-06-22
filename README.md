@@ -13,9 +13,9 @@
 This is a header-only library. Just copy the include directory to your location of choice.
 
 **Prerequisites**
--Boost
--ZLib / GZip
--log4cplus
+- Boost
+- ZLib / GZip
+- log4cplus
 
 ## Copyright and License
 
