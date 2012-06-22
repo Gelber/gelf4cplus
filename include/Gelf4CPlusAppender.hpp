@@ -1,0 +1,324 @@
+#if !defined(GELF4CPLUSAPPENDER_HPP)
+#define	GELF4CPLUSAPPENDER_HPP
+
+/*- HEADER FILES -------------------------------------------------------------*/
+
+// System Header Files
+
+#include <string>
+#include <vector>
+#include <stdint.h>
+
+// Third-party Header Files
+
+#include <log4cplus/appender.h>
+#include <log4cplus/syslogappender.h>
+#include <log4cplus/configurator.h>
+#include <boost/algorithm/string.hpp>
+#include <boost/unordered_map.hpp>
+#include <boost/asio.hpp>
+#include <boost/tokenizer.hpp>
+#include <boost/foreach.hpp>
+#include <boost/shared_ptr.hpp>
+
+// Other Header Files
+
+#include "UdpTransport.hpp"
+#include "GelfMessage.hpp"
+
+/*- NAMESPACES ---------------------------------------------------------------*/
+
+namespace gelf4cplus
+{
+namespace appender
+{
+
+/*- CONSTANTS ----------------------------------------------------------------*/
+
+const bool INCLUDE_LOCATION_DEFAULT = false; ///< Default for including location.
+
+/*- CLASSES ------------------------------------------------------------------*/
+
+/**
+ * Dummy class to give public access to the getSysLogLevel() method
+ */
+class SysLogLevel : public log4cplus::SysLogAppender
+{
+public:
+
+    // Constructors & Destructors
+
+    /**
+     * The default constructor.
+     */
+    SysLogLevel() : log4cplus::SysLogAppender("SysLogLevel")
+    {
+    }
+
+    /**
+     * We want to make getSysLogLevel() public.
+     */
+    using log4cplus::SysLogAppender::getSysLogLevel;
+};
+
+/**
+ * Dummy constant to give static access to getSysLogLevel() method
+ */
+const SysLogLevel SYSLOG_LEVEL;
+
+/**
+ * This class defines the GELF appender, which creates GELF messages and sends
+ * them using the specified transport.
+ */
+template <typename Transport>
+class Gelf4CPlusAppender : public log4cplus::Appender
+{
+public:
+
+    // Type Definitions
+
+    typedef boost::unordered_map<std::string, std::string> Dictionary;
+
+    // Constructors and Destructors
+
+    /**
+     * The default constructor.
+     * @param aTransport A transport to use when sending GELF messages.
+     * @param includeLocationInformation Should we include file and line info?
+     */
+    Gelf4CPlusAppender(Transport *aTransport = NULL,
+                       const bool &includeLocationInformation = INCLUDE_LOCATION_DEFAULT) :
+    m_transport(aTransport),
+    m_includeLocationInformation(includeLocationInformation)
+    {
+        try
+        {
+            m_loggingHostName = boost::asio::ip::host_name();
+        }
+        catch (...)
+        {
+            m_loggingHostName = message::UNKNOWN_HOST;
+        }
+    }
+
+    /**
+     * A virtual destructor in case someone wants to derive from this class.
+     */
+    virtual ~Gelf4CPlusAppender()
+    {
+        close();
+    }
+
+    // Methods
+
+    /**
+     * Gets a const reference to the additional fields dictionary.
+     * @return 
+     */
+    virtual const Dictionary& additionalFields() const
+    {
+        return m_additionalFields;
+    }
+
+    /**
+     * Parses a string of comma separated key:value pairs and adds them in the
+     * additional fields dictionary.
+     * @param aValue
+     * @return 
+     */
+    virtual bool additionalFields(const std::string &aValue)
+    {
+        // Tokenize the string into individual fields
+        boost::tokenizer< boost::char_separator<char> > fields(aValue,
+                                                               boost::char_separator<char>(","));
+
+        // For each field...
+
+        BOOST_FOREACH(std::string field, fields)
+        {
+            // ...split the field into a key and value
+            std::vector<std::string> keyValue(2);
+            boost::algorithm::split(keyValue, field, boost::is_any_of(":"));
+
+            // ...make sure we have exactly a key and value
+            if (keyValue.size() != 2)
+            {
+                return false;
+            }
+
+            // ...trim any whitespace
+            boost::algorithm::trim(keyValue[0]);
+            boost::algorithm::trim(keyValue[1]);
+
+            // ...add the field to the map
+            m_additionalFields[keyValue[0]] = keyValue[1];
+        }
+
+        return true;
+    }
+
+    /**
+     * Clears the additional fields dictionary.
+     */
+    virtual void clearAdditionalFields()
+    {
+        m_additionalFields.clear();
+    }
+
+    /**
+     * Adds or changes a single additional field in the dictionary.
+     * @param aKey A key for the additional field.
+     * @param aValue A value for the additional field.
+     */
+    virtual void additionalField(const std::string &aKey,
+                                 const std::string &aValue)
+    {
+        m_additionalFields[aKey] = aValue;
+    }
+
+    /**
+     * Should we include file and line information?
+     * @return True if including file and line info, false if not.
+     */
+    virtual bool includeLocationInformation() const
+    {
+        return m_includeLocationInformation;
+    }
+
+    /**
+     * Set the boolean to include or exclude file and line information.
+     * @param aValue True if including file and line info, false if not.
+     */
+    virtual void includeLocationInformation(const bool &aValue)
+    {
+        m_includeLocationInformation = aValue;
+    }
+
+    /**
+     * Closes this appender.
+     */
+    virtual void close()
+    {
+        m_transport.reset();
+    }
+
+    /**
+     * Sets the transport to a new transport.
+     * @param aValue The new transport value.
+     */
+    virtual void transport(Transport *aValue)
+    {
+        // Close the existing transport
+        close();
+
+        // Set the new transport
+        m_transport.reset(aValue);
+    }
+
+    /**
+     * Is this instance valid?
+     * @return True if valid, false if not.
+     */
+    virtual bool isValid() const
+    {
+        // Not valid if transport is NULL
+        if (m_transport == NULL)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+protected:
+
+    // Attributes
+
+    boost::shared_ptr<Transport> m_transport; ///< Shared pointer to transport.
+    std::string m_loggingHostName; ///< Name of this host.
+    bool m_includeLocationInformation; ///< Should we include file and line?
+    Dictionary m_additionalFields; ///< Dictionary of additional fields.
+
+    // Methods
+
+    /**
+     * The overridden method for appending.
+     * @param anEvent The logging event to append.
+     */
+    virtual void append(const log4cplus::spi::InternalLoggingEvent &anEvent)
+    {
+        // Can't append if not valid
+        if (!isValid())
+        {
+            return;
+        }
+
+        // Get the compressed JSON
+        std::string gelfJsonString;
+        createGelfJsonFromLoggingEvent(anEvent, gelfJsonString);
+
+        // Send the message using the transport
+        m_transport->send(gelfJsonString);
+    }
+
+    /**
+     * Creates the JSON String for a given logging event.
+     * The short message of the GELF message is a maximum of 250 chars long.
+     * Message building and skipping of additional fields etc is based on
+     * https://github.com/Graylog2/graylog2-docs/wiki/GELF from May 21, 2012.
+     * @param anEvent The logging event to base the JSON creation on.
+     * @param anEvent GELF message as compressed JSON.
+     */
+    virtual void createGelfJsonFromLoggingEvent(const log4cplus::spi::InternalLoggingEvent &anEvent,
+                                                std::string &aGelfJsonString) const
+    {
+        // Get the full message
+        log4cplus::tstring fullMessage = anEvent.getMessage();
+
+        const log4cplus::helpers::Time &time = anEvent.getTimestamp();
+
+        // Create the basic GELF message
+        message::GelfMessage gelfMessage(fullMessage.substr(0, message::SHORT_MESSAGE_LENGTH - 1),
+                                         m_loggingHostName,
+                                         time.sec() + (time.usec() / 1000000.0),
+                                         fullMessage,
+                                         SYSLOG_LEVEL.getSysLogLevel(anEvent.getLogLevel()),
+                                         anEvent.getLoggerName());
+
+        // Only include location information if configured
+        if (m_includeLocationInformation)
+        {
+            gelfMessage.file(anEvent.getFile());
+            gelfMessage.line(anEvent.getLine());
+        }
+
+        // Add additional fields
+
+        BOOST_FOREACH(Dictionary::value_type field, m_additionalFields)
+        {
+            gelfMessage[field.first] = field.second;
+        }
+
+        // Add the event type
+        gelfMessage["type"] = (int64_t) anEvent.getType();
+
+        // Add the thread
+        gelfMessage["thread"] = anEvent.getThread();
+
+        // Add NDC properties
+        log4cplus::tstring ndc = anEvent.getNDC();
+
+        if (!ndc.empty())
+        {
+            gelfMessage["ndc"] = ndc;
+        }
+
+        // Serialize the message
+        gelfMessage.serialize(aGelfJsonString);
+    }
+};
+
+} // namespace appender
+} // namespace gelf4cplus
+
+#endif // if !defined(GELF4CPLUSAPPENDER_HPP)
