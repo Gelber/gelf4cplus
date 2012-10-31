@@ -1,6 +1,6 @@
 /* 
- * File:   GelfMessage.h
- * Author: sbidny
+ * File:   GelfMessage.hpp
+ * Author: Steven Bidny
  *
  * Created on May 22, 2012, 12:57 PM
  */
@@ -20,11 +20,12 @@
 
 // Third-party Header Files
 
+#define BOOST_IOSTREAM_NO_LIB
+
 #include "json_spirit/json_spirit_writer_template.h"
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
-
 
 /*- NAMESPACES ---------------------------------------------------------------*/
 
@@ -33,27 +34,29 @@ namespace gelf4cplus
 namespace message
 {
 
+using std::string;
+
 /*- CONSTANTS ----------------------------------------------------------------*/
 
 const int NO_LINE = -1;
-const std::string DEFAULT_FACILITY = "";
+const string DEFAULT_FACILITY = "";
 const double USE_SERVER_TIMESTAMP = -1.0;
-const std::string GELF_VERSION = "1.0";
-const std::string UNKNOWN_HOST = "unknown_host";
-const std::string DEFAULT_SHORT_MESSAGE = "empty";
+const string GELF_VERSION = "1.0";
+const string UNKNOWN_HOST = "unknown_host";
+const string DEFAULT_SHORT_MESSAGE = "empty";
 const size_t SHORT_MESSAGE_LENGTH = 250;
 
 // Fields
 
-const std::string VERSION = "version";
-const std::string HOST = "host";
-const std::string SHORT_MESSAGE = "short_message";
-const std::string TIMESTAMP = "timestamp";
-const std::string FULL_MESSAGE = "full_message";
-const std::string LEVEL = "level";
-const std::string FACILITY = "facility";
-const std::string FILE = "file";
-const std::string LINE = "line";
+const string VERSION = "version";
+const string HOST = "host";
+const string SHORT_MESSAGE = "short_message";
+const string TIMESTAMP = "timestamp";
+const string FULL_MESSAGE = "full_message";
+const string LEVEL = "level";
+const string FACILITY = "facility";
+const string FILE = "file";
+const string LINE = "line";
 
 /*- CLASSES ------------------------------------------------------------------*/
 
@@ -70,7 +73,7 @@ public:
     typedef json_spirit::mObject Object; ///< JSON object type
     typedef json_spirit::Value_type ValueType; ///< Type of value
 
-    // Constructors & Destructors
+    // Constructors & Destructor
 
     /**
      * The constructor.
@@ -84,15 +87,15 @@ public:
      * @param aLine The line number.
      * @param aVersion The GELF version.
      */
-    GelfMessage(const std::string &aShortMessage = DEFAULT_SHORT_MESSAGE,
-                const std::string &aHost = UNKNOWN_HOST,
+    GelfMessage(const string &aShortMessage = DEFAULT_SHORT_MESSAGE,
+                const string &aHost = UNKNOWN_HOST,
                 const double &aTimestamp = USE_SERVER_TIMESTAMP,
-                const std::string &aFullMessage = "",
+                const string &aFullMessage = "",
                 const uint8_t &aLevel = 1,
-                const std::string &aFacility = DEFAULT_FACILITY,
-                const std::string &aFile = "",
+                const string &aFacility = DEFAULT_FACILITY,
+                const string &aFile = "",
                 const int &aLine = NO_LINE,
-                const std::string &aVersion = GELF_VERSION)
+                const string &aVersion = GELF_VERSION)
     {
         // If any of the sets fails, throw an exception
         if (!version(aVersion) ||
@@ -123,7 +126,7 @@ public:
      * @param aVersion The new GELF version.
      * @return True if the new GELF version was set.
      */
-    virtual bool version(const std::string &aVersion)
+    virtual bool version(const string &aVersion)
     {
         // If there is no version, use the default GELF_VERSION
         if (aVersion == "")
@@ -143,7 +146,7 @@ public:
      * @param aHost The new host name.
      * @return True if the new host name was set.
      */
-    virtual bool host(const std::string &aHost)
+    virtual bool host(const string &aHost)
     {
         // If there is no host, use the default UNKNOWN_HOST
         if (aHost == "")
@@ -163,7 +166,7 @@ public:
      * @param aShortMessage A new short message.
      * @return True if the new short message was set.
      */
-    virtual bool shortMessage(const std::string &aShortMessage)
+    virtual bool shortMessage(const string &aShortMessage)
     {
         // If there is no short message, use the default DEFAULT_MESSAGE
         if (aShortMessage == "")
@@ -203,7 +206,7 @@ public:
      * @param aFullMessage The new full message.
      * @return True if the new full message was set.
      */
-    virtual bool fullMessage(const std::string &aFullMessage)
+    virtual bool fullMessage(const string &aFullMessage)
     {
         // If there is no full message, erase this entry
         if (aFullMessage == "")
@@ -241,7 +244,7 @@ public:
      * @param aFacility The new facility.
      * @return True if the new facility was set.
      */
-    virtual bool facility(const std::string &aFacility)
+    virtual bool facility(const string &aFacility)
     {
         // If there is no facility, set it to the default value
         if (aFacility == "")
@@ -261,7 +264,7 @@ public:
      * @param aFile The new filename.
      * @return True if the new filename was set.
      */
-    virtual bool file(const std::string &aFile)
+    virtual bool file(const string &aFile)
     {
         // If there is no file, erase this entry
         if (aFile == "")
@@ -305,7 +308,7 @@ public:
      * Return the GELF version.
      * @return The GELF version.
      */
-    virtual std::string version()
+    virtual string version()
     {
         return m_object[VERSION].get_str();
     }
@@ -314,7 +317,7 @@ public:
      * Return the host name.
      * @return The host name.
      */
-    virtual std::string host()
+    virtual string host()
     {
         return m_object[HOST].get_str();
     }
@@ -323,7 +326,7 @@ public:
      * Return the short message.
      * @return The short message.
      */
-    virtual std::string shortMessage()
+    virtual string shortMessage()
     {
         return m_object[SHORT_MESSAGE].get_str();
     }
@@ -341,7 +344,7 @@ public:
      * Return the full message.
      * @return The full message.
      */
-    virtual std::string fullMessage()
+    virtual string fullMessage()
     {
         return m_object[FULL_MESSAGE].get_str();
     }
@@ -359,7 +362,7 @@ public:
      * Return the facility.
      * @return The facility.
      */
-    virtual std::string facility()
+    virtual string facility()
     {
         return m_object[FACILITY].get_str();
     }
@@ -368,7 +371,7 @@ public:
      * Return the filename.
      * @return The filename.
      */
-    virtual std::string file()
+    virtual string file()
     {
         return m_object[FILE].get_str();
     }
@@ -386,9 +389,8 @@ public:
      * Serialize this object using JSON and compression.
      * @param aSerializedString The output of the serialization of this object.
      */
-    virtual void serialize(std::string &aSerializedString) const
+    virtual void serialize(string &aSerializedString) const
     {
-        std::cout << json_spirit::write_string((Value) m_object, json_spirit::remove_trailing_zeros) << std::endl;
         // Get the JSON, compress it, and set it to the output buffer
         compress(json_spirit::write_string((Value) m_object, json_spirit::remove_trailing_zeros),
                  aSerializedString);
@@ -402,7 +404,7 @@ public:
      * @return A pair with an iterator to the inserted value and a boolean which
      * is false if the field already existed.
      */
-    virtual std::pair<Object::iterator, bool> insert(const std::string &aKey,
+    virtual std::pair<Object::iterator, bool> insert(const string &aKey,
                                                      const Value &aValue)
     {
         if (isAllowedKey(aKey))
@@ -431,7 +433,7 @@ public:
      * @param aKey A key to a field.
      * @return A reference to the value at this key.
      */
-    virtual Value& at(const std::string &aKey)
+    virtual Value& at(const string &aKey)
     {
         json_spirit::mObject::iterator it = m_object.find(makeKey(aKey));
 
@@ -451,7 +453,7 @@ public:
      * @param aKey A key to a field.
      * @return A reference to the value at this key.
      */
-    virtual Value& operator [](const std::string &aKey)
+    virtual Value& operator [](const string &aKey)
     {
         if (isAllowedKey(aKey))
         {
@@ -468,7 +470,7 @@ public:
      * @param aKey A key to a field.
      * @return The type of field at the specified key.
      */
-    virtual ValueType type(const std::string &aKey)
+    virtual ValueType type(const string &aKey)
     {
         return at(makeKey(aKey)).type();
     }
@@ -478,7 +480,7 @@ public:
      * @param aKey Key to erase.
      * @return True if the key was not required, was found, and was erased.
      */
-    virtual bool erase(const std::string &aKey)
+    virtual bool erase(const string &aKey)
     {
         // Don't delete required fields
         if (isRequiredField(aKey))
@@ -504,8 +506,8 @@ protected:
      * @param aCompressedMessage The compressed output message.
      * @return True if the compression succeeded.
      */
-    virtual void compress(const std::string &aMessage,
-                          std::string &aCompressedMessage) const
+    virtual void compress(const string &aMessage,
+                          string &aCompressedMessage) const
     {
         std::istringstream ss(aMessage);
         boost::iostreams::filtering_istream in;
@@ -521,7 +523,7 @@ protected:
      * @param aKey A key to a field.
      * @return True if the field is a required GELF field.
      */
-    virtual bool isRequiredField(const std::string &aKey)
+    virtual bool isRequiredField(const string &aKey)
     {
         if (aKey == VERSION ||
                 aKey == HOST ||
@@ -538,7 +540,7 @@ protected:
      * @param aKey A key to a field.
      * @return True if the field is a standard GELF field.
      */
-    virtual bool isStandardField(const std::string &aKey)
+    virtual bool isStandardField(const string &aKey)
     {
         if (aKey == VERSION ||
                 aKey == HOST ||
@@ -561,9 +563,9 @@ protected:
      * @param aKey The key to check.
      * @return True if key is allowed, false if not.
      */
-    virtual bool isAllowedKey(const std::string &aKey)
+    virtual bool isAllowedKey(const string &aKey)
     {
-        std::string key = makeKey(aKey);
+        string key = makeKey(aKey);
 
         if (aKey == "_id")
         {
@@ -578,9 +580,9 @@ protected:
      * @param aKey A key to a field.
      * @return The key prepended with '_' if not a standard field.
      */
-    virtual std::string makeKey(const std::string &aKey)
+    virtual string makeKey(const string &aKey)
     {
-        std::string key = ((isStandardField(aKey) || aKey.at(0) == '_') ? aKey : '_' + aKey);
+        string key = ((isStandardField(aKey) || aKey.at(0) == '_') ? aKey : '_' + aKey);
 
         return key;
     }

@@ -1,3 +1,10 @@
+/* 
+ * File:   UdpTransport.hpp
+ * Author: Steven Bidny
+ *
+ * Created on May 22, 2012, 12:57 PM
+ */
+
 #if !defined(UDPTRANSPORT_HPP)
 #define UDPTRANSPORT_HPP
 
@@ -12,6 +19,7 @@
 
 // Third-party Headers
 
+#define BOOST_SYSTEM_NO_LIB
 #include <boost/functional/hash.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/asio.hpp>
@@ -30,11 +38,14 @@ namespace gelf4cplus
 namespace transport
 {
 
+using std::string;
+
 /*- CONSTANTS ----------------------------------------------------------------*/
 
 const uint16_t DISABLE_CHUNKING = 0; ///< Constant used to disable chunking.
 const uint16_t DEFAULT_CHUNK_SIZE = 1024; ///< The default size of chunks.
 const int DEFAULT_GRAYLOG2_PORT = 12201; ///< The default Graylog2 port.
+const string DEFAULT_GRAYLOG2_HOST = "localhost"; ///< The default Graylog2 host.
 
 /*- CLASSES ------------------------------------------------------------------*/
 
@@ -45,7 +56,7 @@ class UdpTransport : public ITransport
 {
 public:
 
-    // Constructors & Destructors
+    // Constructors & Destructor
 
     /**
      * The default constructor.
@@ -53,23 +64,23 @@ public:
      * @param aDstPort A destination port.
      * @param aMaxChunkSize The maximum size of each chunk.
      */
-    UdpTransport(const std::string &aDstHost = "localhost",
+    UdpTransport(const string &aDstHost = "localhost",
                  const int &aDstPort = DEFAULT_GRAYLOG2_PORT,
                  const uint16_t &aMaxChunkSize = DEFAULT_CHUNK_SIZE) :
-    m_maxChunkSize(aMaxChunkSize)
+                 m_maxChunkSize(aMaxChunkSize)
     {
         // Build the id string using the IP, PID, and TID
         std::ostringstream ss;
         ss << boost::asio::ip::host_name() <<
-                boost::interprocess::ipcdetail::get_current_process_id() <<
-                boost::interprocess::ipcdetail::get_current_thread_id();
+                boost::interprocess::detail::get_current_process_id() <<
+                boost::interprocess::detail::get_current_thread_id();
         m_threadId = ss.str();
 
         // Set up the Boost Asio stuff
         boost::asio::ip::udp::resolver resolver(m_service);
         boost::asio::ip::udp::resolver::query query(boost::asio::ip::udp::v4(),
                                                     aDstHost,
-                                                    boost::lexical_cast<std::string > (aDstPort));
+                                                    boost::lexical_cast<string>(aDstPort));
         m_endpoint = *resolver.resolve(query);
         m_socket = new boost::asio::ip::udp::socket(m_service, m_endpoint.protocol());
     }
@@ -107,7 +118,7 @@ public:
      * Sends a message using this transport.
      * @param aMessage The message to send.
      */
-    virtual void send(const std::string &aMessage)
+    virtual void send(const string &aMessage)
     {
         size_t length = aMessage.length();
 
@@ -115,12 +126,12 @@ public:
                 length > m_maxChunkSize)
         {
             size_t chunkCount = (length / m_maxChunkSize) + 1;
-            std::string messageId;
+            string messageId;
             generateMessageId(messageId);
 
             for (size_t i = 0; i < chunkCount; ++i)
             {
-                std::string messageChunkPrefix;
+                string messageChunkPrefix;
                 createChunkedMessagePart(messageId, i, chunkCount, messageChunkPrefix);
                 size_t skip = i * m_maxChunkSize;
 
@@ -148,7 +159,7 @@ protected:
     boost::asio::ip::udp::endpoint m_endpoint; ///< The Boost endpoint.
     boost::asio::ip::udp::socket *m_socket; ///< The Boost socket.
     boost::asio::io_service m_service; ///< The Boost IO service.
-    std::string m_threadId; ///< The thread ID.
+    string m_threadId; ///< The thread ID.
 
     // Methods
 
@@ -159,10 +170,10 @@ protected:
      * @param aChunkCount The total chunk count.
      * @param aResult The resultant chunk.
      */
-    virtual void createChunkedMessagePart(const std::string &aMessageId,
+    virtual void createChunkedMessagePart(const string &aMessageId,
                                           const size_t &anIndex,
                                           const size_t &aChunkCount,
-                                          std::string &aResult)
+                                          string &aResult)
     {
         // Chunked GELF ID: 0x1e 0x0f (identifying this message as a chunked GELF message)
         aResult.push_back(0x1e);
@@ -183,14 +194,14 @@ protected:
      * ID, thread ID, and time.
      * @param aMessageId The resultant message ID
      */
-    virtual void generateMessageId(std::string &aMessageId)
+    virtual void generateMessageId(string &aMessageId)
     {
         // Create the "unique" string using the host name and current time
         std::ostringstream ss;
         ss << m_threadId << boost::posix_time::microsec_clock::universal_time();
 
         // Create a hash of the "unique" string using Boost
-        size_t hash = boost::hash<std::string > ()(ss.str());
+        size_t hash = boost::hash<string>()(ss.str());
 
         // Return a byte array of the hash using std::string
         aMessageId.assign((char*) &hash, MAX_HEADER_SIZE);

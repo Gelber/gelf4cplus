@@ -1,5 +1,12 @@
+/* 
+ * File:   GelfMessage.h
+ * Author: Steven Bidny
+ *
+ * Created on May 22, 2012, 12:57 PM
+ */
+
 #if !defined(GELF4CPLUSAPPENDER_HPP)
-#define	GELF4CPLUSAPPENDER_HPP
+#define GELF4CPLUSAPPENDER_HPP
 
 /*- HEADER FILES -------------------------------------------------------------*/
 
@@ -14,6 +21,9 @@
 #include <log4cplus/appender.h>
 #include <log4cplus/syslogappender.h>
 #include <log4cplus/configurator.h>
+#include <log4cplus/helpers/stringhelper.h>
+#include <log4cplus/helpers/property.h>
+#include <log4cplus/tstring.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/asio.hpp>
@@ -23,7 +33,7 @@
 
 // Other Header Files
 
-#include "UdpTransport.hpp"
+#include "ITransport.hpp"
 #include "GelfMessage.hpp"
 
 /*- NAMESPACES ---------------------------------------------------------------*/
@@ -33,9 +43,10 @@ namespace gelf4cplus
 namespace appender
 {
 
-/*- CONSTANTS ----------------------------------------------------------------*/
-
-const bool INCLUDE_LOCATION_DEFAULT = false; ///< Default for including location.
+using transport::ITransport;
+using log4cplus::tstring;
+using log4cplus::helpers::Properties;
+using std::string;
 
 /*- CLASSES ------------------------------------------------------------------*/
 
@@ -46,7 +57,7 @@ class SysLogLevel : public log4cplus::SysLogAppender
 {
 public:
 
-    // Constructors & Destructors
+    // Constructors & Destructor
 
     /**
      * The default constructor.
@@ -70,34 +81,59 @@ const SysLogLevel SYSLOG_LEVEL;
  * This class defines the GELF appender, which creates GELF messages and sends
  * them using the specified transport.
  */
-template <typename Transport>
+
 class Gelf4CPlusAppender : public log4cplus::Appender
 {
 public:
 
     // Type Definitions
 
-    typedef boost::unordered_map<std::string, std::string> Dictionary;
+    typedef boost::unordered_map<string, string> Dictionary;
 
-    // Constructors and Destructors
+    // Constructors and Destructor
 
     /**
      * The default constructor.
      * @param aTransport A transport to use when sending GELF messages.
-     * @param includeLocationInformation Should we include file and line info?
+     * @param properties Some properties to use when constructing this object.
      */
-    Gelf4CPlusAppender(Transport *aTransport = NULL,
-                       const bool &includeLocationInformation = INCLUDE_LOCATION_DEFAULT) :
-    m_transport(aTransport),
-    m_includeLocationInformation(includeLocationInformation)
+    Gelf4CPlusAppender(ITransport *aTransport = NULL,
+                       const Properties &properties = Properties()) :
+                       m_transport(aTransport)
     {
+        // Try to get the host name
         try
         {
             m_loggingHostName = boost::asio::ip::host_name();
         }
         catch (...)
         {
-            m_loggingHostName = message::UNKNOWN_HOST;
+            m_loggingHostName = properties.getProperty("loggingHostName",
+                                                       message::UNKNOWN_HOST);
+        }
+
+        // Get the facility property
+        m_facility = properties.getProperty("facility", "");
+
+        // Get the includeLocationInformation property
+        tstring includeLocationInformation =
+                properties.getProperty("includeLocationInformation", "false");
+
+        // Parse the includeLocationInformation property
+        m_includeLocationInformation =
+                log4cplus::helpers::toLower(includeLocationInformation)[0] == 't';
+ 
+        // Get the subset of additional field properties
+        Properties additionalFields = properties.getPropertySubset("additionalField.");
+
+        // Get the list of property names for the additional fields
+        std::vector<tstring> propertyNames = additionalFields.propertyNames();
+
+        // For each property name...
+        BOOST_FOREACH(tstring propertyName, propertyNames)
+        {
+            // Add an additional field
+            additionalField(propertyName, additionalFields.getProperty(propertyName));
         }
     }
 
@@ -126,7 +162,7 @@ public:
      * @param aValue
      * @return 
      */
-    virtual bool additionalFields(const std::string &aValue)
+    virtual bool additionalFields(const string &aValue)
     {
         // Tokenize the string into individual fields
         boost::tokenizer< boost::char_separator<char> > fields(aValue,
@@ -134,10 +170,10 @@ public:
 
         // For each field...
 
-        BOOST_FOREACH(std::string field, fields)
+        BOOST_FOREACH(string field, fields)
         {
             // ...split the field into a key and value
-            std::vector<std::string> keyValue(2);
+            std::vector<string> keyValue(2);
             boost::algorithm::split(keyValue, field, boost::is_any_of(":"));
 
             // ...make sure we have exactly a key and value
@@ -170,8 +206,7 @@ public:
      * @param aKey A key for the additional field.
      * @param aValue A value for the additional field.
      */
-    virtual void additionalField(const std::string &aKey,
-                                 const std::string &aValue)
+    virtual void additionalField(const string &aKey, const string &aValue)
     {
         m_additionalFields[aKey] = aValue;
     }
@@ -206,7 +241,7 @@ public:
      * Sets the transport to a new transport.
      * @param aValue The new transport value.
      */
-    virtual void transport(Transport *aValue)
+    virtual void transport(ITransport *aValue)
     {
         // Close the existing transport
         close();
@@ -221,21 +256,16 @@ public:
      */
     virtual bool isValid() const
     {
-        // Not valid if transport is NULL
-        if (m_transport == NULL)
-        {
-            return false;
-        }
-
-        return true;
+        return m_transport != 0;
     }
 
 protected:
 
     // Attributes
 
-    boost::shared_ptr<Transport> m_transport; ///< Shared pointer to transport.
-    std::string m_loggingHostName; ///< Name of this host.
+    boost::shared_ptr<ITransport> m_transport; ///< Shared pointer to transport.
+    string m_loggingHostName; ///< Name of this host.
+    string m_facility; ///< Facility for this appender.
     bool m_includeLocationInformation; ///< Should we include file and line?
     Dictionary m_additionalFields; ///< Dictionary of additional fields.
 
@@ -254,7 +284,7 @@ protected:
         }
 
         // Get the compressed JSON
-        std::string gelfJsonString;
+        string gelfJsonString;
         createGelfJsonFromLoggingEvent(anEvent, gelfJsonString);
 
         // Send the message using the transport
@@ -270,10 +300,10 @@ protected:
      * @param anEvent GELF message as compressed JSON.
      */
     virtual void createGelfJsonFromLoggingEvent(const log4cplus::spi::InternalLoggingEvent &anEvent,
-                                                std::string &aGelfJsonString) const
+                                                string &aGelfJsonString) const
     {
         // Get the full message
-        log4cplus::tstring fullMessage = anEvent.getMessage();
+        tstring fullMessage = anEvent.getMessage();
 
         const log4cplus::helpers::Time &time = anEvent.getTimestamp();
 
@@ -283,7 +313,7 @@ protected:
                                          time.sec() + (time.usec() / 1000000.0),
                                          fullMessage,
                                          SYSLOG_LEVEL.getSysLogLevel(anEvent.getLogLevel()),
-                                         anEvent.getLoggerName());
+                                         m_facility.empty() ? anEvent.getLoggerName() : m_facility);
 
         // Only include location information if configured
         if (m_includeLocationInformation)
@@ -293,7 +323,6 @@ protected:
         }
 
         // Add additional fields
-
         BOOST_FOREACH(Dictionary::value_type field, m_additionalFields)
         {
             gelfMessage[field.first] = field.second;
@@ -305,8 +334,11 @@ protected:
         // Add the thread
         gelfMessage["thread"] = anEvent.getThread();
 
+        // Add the logger name
+        gelfMessage["logger_name"] = anEvent.getLoggerName();
+
         // Add NDC properties
-        log4cplus::tstring ndc = anEvent.getNDC();
+        tstring ndc = anEvent.getNDC();
 
         if (!ndc.empty())
         {

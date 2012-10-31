@@ -1,3 +1,10 @@
+/* 
+ * File:   ITransport.hpp
+ * Author: Steven Bidny
+ *
+ * Created on May 22, 2012, 12:57 PM
+ */
+
 #if !defined(TRANSPORT_HPP)
 #define TRANSPORT_HPP
 
@@ -23,7 +30,7 @@ class ITransport
 {
 public:
 
-    // Constructors & Destructors
+    // Constructors & Destructor
 
     /**
      * A virtual destructor since this is an interface.
