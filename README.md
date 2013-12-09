@@ -4,7 +4,7 @@
 
 [GELF][1]
 
-[1]: https://github.com/Graylog2/graylog2-docs/wiki/GELF
+[1]: http://graylog2.org/gelf
 
 ## Usage
 
