@@ -72,8 +72,8 @@ public:
         // Build the id string using the IP, PID, and TID
         std::ostringstream ss;
         ss << boost::asio::ip::host_name() <<
-                boost::interprocess::detail::get_current_process_id() <<
-                boost::interprocess::detail::get_current_thread_id();
+                boost::interprocess::ipcdetail::get_current_process_id() <<
+                boost::interprocess::ipcdetail::get_current_thread_id();
         m_threadId = ss.str();
 
         // Set up the Boost Asio stuff

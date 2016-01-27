@@ -70,10 +70,12 @@ public:
                 new gelf4cplus::appender::Gelf4CPlusAppender(new transport::UdpTransport(host, port), properties));
     }
 
-    tstring getTypeName()
+    virtual log4cplus::tstring const & getTypeName() const
     {
-        return "log4cplus::Gelf4CPlusAppender";
+    	static tstring typeName = "log4cplus::Gelf4CPlusAppender";
+        return typeName;
     }
+
 };
 
 } // namespace appender

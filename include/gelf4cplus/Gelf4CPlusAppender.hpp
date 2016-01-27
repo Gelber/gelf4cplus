@@ -24,6 +24,7 @@
 #include <log4cplus/helpers/stringhelper.h>
 #include <log4cplus/helpers/property.h>
 #include <log4cplus/tstring.h>
+#include <log4cplus/spi/loggingevent.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/asio.hpp>
